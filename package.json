@@ -1,0 +1,20 @@
+{
+  "name": "umuganda-t",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Frontend for Umuganda-T community work tracker.",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "vite build",
+    "preview": "node server.js",
+    "start": "node server.js"
+  },
+  "devDependencies": {
+    "vite": "^8.0.9"
+  },
+  "dependencies": {
+    "mysql2": "^3.22.2",
+    "sequelize": "^6.37.8"
+  }
+}
