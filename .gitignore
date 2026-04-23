@@ -1,0 +1,24 @@
+# Dependencies
+**/node_modules/
+
+# Build output
+**/dist/
+**/build/
+**/.next/
+**/.vercel/
+
+# Environment files
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs
+*.log
+
+# Editor and OS files
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local backup of the old nested repository metadata
+.git-umugandapro-backup/
