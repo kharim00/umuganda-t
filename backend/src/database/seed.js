@@ -1,26 +1,21 @@
-"use strict";
-const bcrypt = require("bcrypt");
+require("dotenv").config();
 
-module.exports = {
-  async up(queryInterface, Sequelize) {
-    const hashedPassword = await bcrypt.hash("admin123", 10);
+const { createConfig } = require("../config/appConfig");
+const { DemoDataService } = require("../services/demoDataService");
 
-    await queryInterface.bulkInsert("users", [ // 🔥 FIXED TABLE NAME
-      {
-        id: Sequelize.literal("UUID()"), // 🔥 FIXED UUID
-        name: "System Admin",
-        phone: "0780000000",
-        password: hashedPassword,
-        role: "admin",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
-  },
+async function runSeed() {
+  const config = createConfig(process.env);
+  const dataService = new DemoDataService({
+    filePath: config.demoDataFile
+  });
 
-  async down(queryInterface, Sequelize) {
-    await queryInterface.bulkDelete("users", {
-      phone: "0780000000",
-    });
-  },
-};
+  await dataService.init();
+  await dataService.reset();
+
+  console.log(`Demo data reset at ${config.demoDataFile}`);
+}
+
+runSeed().catch((error) => {
+  console.error("Failed to seed demo data:", error);
+  process.exit(1);
+});

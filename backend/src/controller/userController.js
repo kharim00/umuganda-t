@@ -1,19 +1,57 @@
-const User = require("../database/models/userModel");
-
-// Get all users (Admin)
-exports.getUsers = async (req, res) => {
-  const users = await User.findAll();
-  res.json(users);
+exports.getUsers = async (req, res, next) => {
+  try {
+    const dataService = req.app.locals.dataService;
+    const users = await dataService.listUsers({
+      role: req.query.role,
+      status: req.query.status
+    });
+    res.json(users);
+  } catch (error) {
+    next(error);
+  }
 };
 
-// Promote user
-exports.updateRole = async (req, res) => {
-  const { id } = req.params;
-  const { role } = req.body;
+exports.updateApproval = async (req, res, next) => {
+  try {
+    const dataService = req.app.locals.dataService;
+    const user = await dataService.updateApproval(
+      req.params.id,
+      req.body.status
+    );
+    res.json({
+      message: `Account status updated to ${user.status}.`,
+      user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
-  const user = await User.findByPk(id);
-  user.role = role;
-  await user.save();
+exports.updateRole = async (req, res, next) => {
+  try {
+    const dataService = req.app.locals.dataService;
+    const user = await dataService.updateUserRole(req.params.id, req.body.role);
+    res.json({
+      message: "Role updated successfully.",
+      user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
-  res.json({ message: "Role updated", user });
+exports.updateLeaderPermissions = async (req, res, next) => {
+  try {
+    const dataService = req.app.locals.dataService;
+    const user = await dataService.updateLeaderPermissions(
+      req.params.id,
+      req.body.canManageWork
+    );
+    res.json({
+      message: "Leader work permissions updated successfully.",
+      user
+    });
+  } catch (error) {
+    next(error);
+  }
 };

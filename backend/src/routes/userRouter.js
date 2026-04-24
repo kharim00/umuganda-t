@@ -1,14 +1,19 @@
 const express = require("express");
-const router = express.Router();
 
 const userController = require("../controller/userController");
 const auth = require("../middleware/authMiddleware");
 const role = require("../middleware/roleMiddleware");
 
-// Admin only
-router.get("/", auth, role("admin"), userController.getUsers);
+const router = express.Router();
 
-// Promote user
+router.get("/", auth, role("admin"), userController.getUsers);
+router.patch("/:id/approval", auth, role("admin"), userController.updateApproval);
+router.patch(
+  "/:id/permissions",
+  auth,
+  role("admin"),
+  userController.updateLeaderPermissions
+);
 router.put("/:id/role", auth, role("admin"), userController.updateRole);
 
 module.exports = router;

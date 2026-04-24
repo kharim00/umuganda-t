@@ -1,0 +1,249 @@
+{
+  "meta": {
+    "generatedAt": "2026-04-23T22:39:47.922Z",
+    "version": 1
+  },
+  "users": [
+    {
+      "id": "user-admin",
+      "name": "System Admin",
+      "email": "admin@umuganda.rw",
+      "phone": "0781234567",
+      "village": "Kigali Central",
+      "nationalId": "100000001",
+      "role": "admin",
+      "status": "approved",
+      "permissions": {
+        "canManageWork": true
+      },
+      "passwordHash": "$2b$10$/j7piN/tnS25uz5UVIgPdOLWHv9RlkU.60Ee9XqDG5KewSOSD4YZi",
+      "createdAt": "2026-04-23T22:39:48.083Z",
+      "updatedAt": "2026-04-23T22:39:48.083Z"
+    },
+    {
+      "id": "user-leader-1",
+      "name": "Leader Nyabugogo",
+      "email": "leader@umuganda.rw",
+      "phone": "0781234568",
+      "village": "Nyabugogo",
+      "nationalId": "100000002",
+      "role": "leader",
+      "status": "approved",
+      "permissions": {
+        "canManageWork": true
+      },
+      "passwordHash": "$2b$10$akYBp08FydU/s4YBk67Omet.AgOlgBNmzyo6QUCLqK4fDbtEzREkC",
+      "createdAt": "2026-04-23T22:39:48.155Z",
+      "updatedAt": "2026-04-24T08:13:14.117Z"
+    },
+    {
+      "id": "user-citizen-1",
+      "name": "Mukamana Marie",
+      "email": "marie@umuganda.rw",
+      "phone": "0789123456",
+      "village": "Kacyiru",
+      "nationalId": "300000001",
+      "role": "citizen",
+      "status": "approved",
+      "permissions": {
+        "canManageWork": false
+      },
+      "passwordHash": "$2b$10$BgS.lhBeOvRh6v0kYizbZ.xceoNBe/SKwY2bvzXHIYSvbiONBr6py",
+      "createdAt": "2026-04-23T22:39:48.155Z",
+      "updatedAt": "2026-04-23T22:39:48.155Z"
+    },
+    {
+      "id": "user-citizen-2",
+      "name": "Niyonzima Pierre",
+      "email": "pierre@umuganda.rw",
+      "phone": "0789123457",
+      "village": "Kacyiru",
+      "nationalId": "300000002",
+      "role": "citizen",
+      "status": "approved",
+      "permissions": {
+        "canManageWork": false
+      },
+      "passwordHash": "$2b$10$7.jlnrQIyGRF5/hVyRIMgeze6vGJ/vyDf2VSoOgeuCt43w48uzmle",
+      "createdAt": "2026-04-23T22:39:48.070Z",
+      "updatedAt": "2026-04-23T22:39:48.070Z"
+    },
+    {
+      "id": "user-citizen-3",
+      "name": "Uwimana Jeanne",
+      "email": "jeanne@umuganda.rw",
+      "phone": "0789123458",
+      "village": "Remera",
+      "nationalId": "300000003",
+      "role": "citizen",
+      "status": "approved",
+      "permissions": {
+        "canManageWork": false
+      },
+      "passwordHash": "$2b$10$MKbqEVzcx8vPC0xUz67LueDrNvMRDG2jrl6B5.hnW89.XLMQml.bW",
+      "createdAt": "2026-04-23T22:39:48.070Z",
+      "updatedAt": "2026-04-23T22:39:48.070Z"
+    },
+    {
+      "id": "user-pending-leader",
+      "name": "Habimana Eric",
+      "email": "eric@umuganda.rw",
+      "phone": "0789000001",
+      "village": "Kimironko",
+      "nationalId": "300000004",
+      "role": "leader",
+      "status": "approved",
+      "permissions": {
+        "canManageWork": false
+      },
+      "passwordHash": "$2b$10$vUJiOye9kB8mHvug3tBrcOr.pel0efnNNbLnKbdf4y5dRhfSSMm1a",
+      "createdAt": "2026-04-23T22:39:48.070Z",
+      "updatedAt": "2026-04-24T06:19:42.104Z"
+    },
+    {
+      "id": "68add517-f9e4-4d3f-a2dd-09c29bc2e128",
+      "name": "irakozecyizahonore",
+      "email": "cyizairakoze9@gmial.com",
+      "phone": "",
+      "village": "Community Area",
+      "nationalId": "",
+      "role": "leader",
+      "status": "approved",
+      "permissions": {
+        "canManageWork": true
+      },
+      "passwordHash": "$2b$10$zTEuuKX/A80tgdC7QEKF2.9f8NFQdvBFolwG8URhMs7vMAziPYR4G",
+      "createdAt": "2026-04-24T07:44:35.398Z",
+      "updatedAt": "2026-04-24T08:14:46.133Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "event-1",
+      "title": "Tree Planting - Nyarugenge",
+      "date": "2026-04-26T06:00:00.000Z",
+      "location": "Sector Office Grounds",
+      "description": "Plant native trees and clean the drainage path.",
+      "createdBy": "user-leader-1"
+    },
+    {
+      "id": "event-2",
+      "title": "Drainage Cleaning - Gasabo",
+      "date": "2026-05-24T06:00:00.000Z",
+      "location": "Kibagabaga Main Road",
+      "description": "Remove debris and improve access for rainy season drainage.",
+      "createdBy": "user-leader-1"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-1",
+      "eventId": "event-1",
+      "assignedTo": "user-citizen-1",
+      "description": "Clear overgrowth from the roadside",
+      "zone": "Nyarugenge",
+      "status": "pending",
+      "createdBy": "user-leader-1",
+      "createdAt": "2026-04-23T22:39:47.953Z"
+    },
+    {
+      "id": "task-2",
+      "eventId": "event-1",
+      "assignedTo": "user-citizen-2",
+      "description": "Distribute seedlings to village elders",
+      "zone": "Nyarugenge",
+      "status": "in_progress",
+      "createdBy": "user-leader-1",
+      "createdAt": "2026-04-23T22:39:47.953Z"
+    },
+    {
+      "id": "task-3",
+      "eventId": "event-2",
+      "assignedTo": "user-citizen-3",
+      "description": "Register new participants at the assembly point",
+      "zone": "Gasabo",
+      "status": "scheduled",
+      "createdBy": "user-leader-1",
+      "createdAt": "2026-04-23T22:39:47.953Z"
+    }
+  ],
+  "attendance": [
+    {
+      "id": "attendance-1",
+      "userId": "user-citizen-1",
+      "eventId": "event-1",
+      "status": "present",
+      "method": "qr",
+      "scannedAt": "2026-04-23T22:39:47.953Z"
+    }
+  ],
+  "fines": [
+    {
+      "id": "fine-1",
+      "userId": "user-citizen-2",
+      "eventId": "event-1",
+      "amount": 5000,
+      "reason": "Absent from Umuganda",
+      "status": "unpaid",
+      "createdAt": "2026-04-23T22:39:47.953Z",
+      "updatedAt": "2026-04-23T22:39:47.953Z"
+    }
+  ],
+  "rewards": [
+    {
+      "id": "reward-1",
+      "userId": "user-citizen-1",
+      "points": 20,
+      "badge": "Community Starter",
+      "updatedAt": "2026-04-23T22:39:47.953Z"
+    }
+  ],
+  "payments": {
+    "collectionGoal": 50000,
+    "collectedAmount": 12000,
+    "deposits": [
+      {
+        "id": "deposit-1",
+        "userId": "user-citizen-1",
+        "amount": 2000,
+        "createdAt": "2026-04-23T22:39:47.953Z"
+      },
+      {
+        "id": "deposit-2",
+        "userId": "user-citizen-3",
+        "amount": 10000,
+        "createdAt": "2026-04-23T22:39:47.953Z"
+      }
+    ]
+  },
+  "feedback": [
+    {
+      "id": "feedback-1",
+      "name": "Mukamana Marie",
+      "email": "marie@umuganda.rw",
+      "userId": "user-citizen-1",
+      "message": "Road safety campaign idea.",
+      "status": "Approved",
+      "createdAt": "2026-04-23T22:39:47.953Z"
+    },
+    {
+      "id": "feedback-2",
+      "name": "Niyonzima Pierre",
+      "email": "pierre@umuganda.rw",
+      "userId": "user-citizen-2",
+      "message": "Tool distribution request.",
+      "status": "In review",
+      "createdAt": "2026-04-23T22:39:47.953Z"
+    },
+    {
+      "id": "feedback-3",
+      "name": "Uwimana Jeanne",
+      "email": "jeanne@umuganda.rw",
+      "userId": "user-citizen-3",
+      "message": "Weekend training session.",
+      "status": "Scheduled",
+      "createdAt": "2026-04-23T22:39:47.953Z"
+    }
+  ],
+  "contacts": []
+}

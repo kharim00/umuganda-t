@@ -1,14 +1,14 @@
 const express = require("express");
-const router = express.Router();
 
 const eventController = require("../controller/eventController");
 const auth = require("../middleware/authMiddleware");
 const role = require("../middleware/roleMiddleware");
 
-// Create event → only leader/admin
-router.post("/", auth, role("leader", "admin"), eventController.createEvent);
+const router = express.Router();
 
-// Get events → everyone logged in
-router.get("/", auth, eventController.getEvents);
+router.get("/", eventController.getEvents);
+router.post("/", auth, role("leader", "admin"), eventController.createEvent);
+router.put("/:id", auth, role("leader", "admin"), eventController.updateEvent);
+router.post("/reminders", auth, role("leader", "admin"), eventController.sendReminder);
 
 module.exports = router;

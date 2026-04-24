@@ -1,33 +1,50 @@
 require("dotenv").config();
-const express = require("express");
-const { sequelize } = require("./src/config/DB.js");
 
-const app = express();
-const PORT = process.env.PORT || 7000;
+const { createApp } = require("./src/app");
+const { createConfig } = require("./src/config/appConfig");
+const { DemoDataService } = require("./src/services/demoDataService");
 
-app.use(express.json());
-app.use('/', require('./src/routes/index.js'));
+async function startServer() {
+  try {
+    // Load config (IMPORTANT: includes process.env.PORT for Render)
+    const config = createConfig(process.env);
 
-app.get("/", (req, res) => {
-  res.json({ message: "API is working" });
-});
-
-sequelize.authenticate()
-  .then(() => {
-    console.log("Database connection established successfully");
-
-    return sequelize.sync(); // safe mode
-  })
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`🚀 Server is running on http://localhost:${PORT}`);
-      console.log(`📊 Database is connected and synced`);
-      console.log(`📋 API Documentation available at http://localhost:${PORT}`);
+    // Initialize demo data service
+    const dataService = new DemoDataService({
+      filePath: config.demoDataFile
     });
-  })
-  .catch((err) => {
-    console.error("Unable to connect to the database:", err);
-  });
 
+    await dataService.init();
 
-  console.log("JWT:", process.env.JWT_SECRET);
+    // Create Express app
+    const app = createApp({
+      config,
+      dataService
+    });
+
+    // Start server (Render-safe)
+    const server = app.listen(config.port, () => {
+      const baseUrl =
+        process.env.NODE_ENV === "production"
+          ? "Production server running"
+          : `http://localhost:${config.port}`;
+
+      console.log(`Umuganda-T app running on ${baseUrl}`);
+      console.log(`Mode: ${config.dataMode}`);
+    });
+
+    return { app, server, dataService, config };
+  } catch (error) {
+    console.error("❌ Unable to start Umuganda-T:", error);
+    process.exit(1);
+  }
+}
+
+// Only run server if this file is executed directly
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  startServer
+};

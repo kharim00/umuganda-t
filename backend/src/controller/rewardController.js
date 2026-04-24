@@ -1,9 +1,8 @@
-const Reward = require("../database/models/rewardModel");
-
-exports.getLeaderboard = async (req, res) => {
-  const rewards = await Reward.findAll({
-    order: [["points", "DESC"]],
-  });
-
-  res.json(rewards);
+exports.getLeaderboard = async (req, res, next) => {
+  try {
+    const dataService = req.app.locals.dataService;
+    res.json(await dataService.getLeaderboard());
+  } catch (error) {
+    next(error);
+  }
 };
