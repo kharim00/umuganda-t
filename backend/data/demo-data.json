@@ -115,6 +115,22 @@
       "passwordHash": "$2b$10$zTEuuKX/A80tgdC7QEKF2.9f8NFQdvBFolwG8URhMs7vMAziPYR4G",
       "createdAt": "2026-04-24T07:44:35.398Z",
       "updatedAt": "2026-04-24T08:14:46.133Z"
+    },
+    {
+      "id": "b56eb5f1-badf-4362-8068-d08b9dfa511c",
+      "name": "manzi yvan",
+      "email": "manziyvan@gmail.com",
+      "phone": "",
+      "village": "Community Area",
+      "nationalId": "",
+      "role": "leader",
+      "status": "approved",
+      "permissions": {
+        "canManageWork": false
+      },
+      "passwordHash": "$2b$10$fIuKqZRTLiq3NiFJ7x9XmutZgqK/Fbd4vE/T6iC4bje2.aYw1SlBm",
+      "createdAt": "2026-04-24T10:52:13.933Z",
+      "updatedAt": "2026-04-24T10:52:50.671Z"
     }
   ],
   "events": [

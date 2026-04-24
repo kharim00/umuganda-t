@@ -27,14 +27,32 @@ function createApp({ config, dataService }) {
 
   app.use("/api", routes);
 
-  app.use(express.static(config.frontendDir));
+  // Serve static files only if frontend directory exists
+  const frontendDir = config.frontendDir;
+  const frontendExists = require("fs").existsSync(frontendDir);
+  if (frontendExists) {
+    app.use(express.static(frontendDir));
+  }
+
+  // Fallback route - serve API 404 or frontend index
   app.use((req, res) => {
     if (req.path.startsWith("/api")) {
       res.status(404).json({ message: "Endpoint not found." });
       return;
     }
 
-    res.sendFile(path.join(config.frontendDir, "index.html"));
+    if (frontendExists) {
+      const indexPath = path.join(frontendDir, "index.html");
+      if (require("fs").existsSync(indexPath)) {
+        res.sendFile(indexPath);
+        return;
+      }
+    }
+
+    res.status(200).json({
+      message: "Umuganda-T API is running",
+      endpoints: "/api/users, /api/tasks, /api/events, /api/rewards, /api/fines, /api/attendance"
+    });
   });
 
   app.use((error, req, res, next) => {

@@ -24,10 +24,7 @@ async function startServer() {
 
     // Start server (Render-safe)
     const server = app.listen(config.port, () => {
-      const baseUrl =
-        process.env.NODE_ENV === "production"
-          ? "Production server running"
-          : `http://localhost:${config.port}`;
+      const baseUrl = `http://localhost:${config.port}`;
 
       console.log(`Umuganda-T app running on ${baseUrl}`);
       console.log(`Mode: ${config.dataMode}`);
