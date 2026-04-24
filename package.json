@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-"dev": "cd backend && npm run dev",
+    "start": "cd backend && npm start",
+    "dev": "cd backend && npm run dev",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd umugandapro && npm run dev",
     "install:all": "npm install && cd backend && npm install && cd ../umugandapro && npm install"

@@ -2,17 +2,20 @@
 
 ## ✅ What Was Done
 
-1. **Created `backend/Procfile`** — Tells Render how to start the app
-2. **Created `backend/render.yaml`** — Render Blueprint configuration
-3. **Created `backend/.env.example`** — Environment variable template
-4. **Pushed all changes to GitHub**
+1. **Created root `Procfile`** — Tells Render how to start the app from repo root
+2. **Created root `render.yaml`** — Render Blueprint configuration at repo root
+3. **Updated root `package.json`** — Added `start` script for root-level deployments
+4. **Created `backend/Procfile`** — Legacy fallback for backend-only deployments
+5. **Created `backend/render.yaml`** — Legacy fallback blueprint
+6. **Created `backend/.env.example`** — Environment variable template
+7. **Pushed all changes to GitHub**
 
 ## 📋 Prerequisites
 
 - GitHub account with your code pushed
 - Render account (free tier available at [render.com](https://render.com))
 
-## 🚀 Step-by-Step Deployment
+## 🚀 Step-by-Step Deployment (Recommended — Root Directory)
 
 ### 1. Go to Render Dashboard
 - Visit [dashboard.render.com](https://dashboard.render.com)
@@ -33,10 +36,12 @@ Fill in these settings:
 | **Environment** | `Node` |
 | **Region** | `Oregon (US West)` (or closest to you) |
 | **Branch** | `blackboxai/fix-root-dev-script` (or `main` if merged) |
-| **Root Directory** | `backend` |
-| **Build Command** | `npm install` |
-| **Start Command** | `node index.js` |
+| **Root Directory** | *(leave empty — deploy from repo root)* |
+| **Build Command** | `npm install && cd backend && npm install` |
+| **Start Command** | `cd backend && node index.js` |
 | **Plan** | `Free` |
+
+> **Note:** If you leave the Root Directory empty, Render will auto-detect the root `render.yaml` or use the build/start commands above.
 
 ### 4. Environment Variables (Optional)
 
@@ -69,15 +74,19 @@ Open your deployed URL and check:
 ✅ Frontend and API work together
 ```
 
-## 📁 Important Files for Render
+## 📁 Important Files for Render (Root Deployment)
 
 ```
-backend/
-├── index.js          ← Entry point (already configured)
-├── package.json      ← Dependencies (already configured)
+(root)
+├── package.json      ← Root package with `start` script ✅
 ├── Procfile          ← Start command for Render ✅
-├── render.yaml       ← Blueprint config ✅
-└── .env.example      ← Env var template ✅
+├── render.yaml       ← Blueprint config at root ✅
+└── backend/
+    ├── index.js          ← Entry point
+    ├── package.json      ← Backend dependencies
+    ├── Procfile          ← Legacy fallback
+    ├── render.yaml       ← Legacy fallback
+    └── .env.example      ← Env var template
 ```
 
 ## 🔄 Auto-Deploy
@@ -97,6 +106,7 @@ Render will detect the push and rebuild automatically.
 | Issue | Solution |
 |-------|----------|
 | **Build fails** | Check `npm install` output in Render logs |
+| **Command "start" not found** | Ensure root `package.json` has `"start": "cd backend && npm start"` |
 | **Port error** | Ensure `app.listen(config.port)` uses `process.env.PORT` |
 | **CORS errors** | Backend already allows `*` origins |
 | **404 on frontend** | Backend serves static files from `umugandapro/` directory |
@@ -113,8 +123,9 @@ Render will detect the push and rebuild automatically.
 
 If issues arise, check:
 1. Render Dashboard → Logs tab
-2. Ensure `backend/` is set as Root Directory
-3. Verify `Procfile` has: `web: node index.js`
+2. Ensure **Root Directory is empty** (or set to `backend` with matching commands)
+3. Verify root `Procfile` has: `web: cd backend && node index.js`
+4. Verify root `package.json` has: `"start": "cd backend && npm start"`
 
 ---
 
