@@ -92,6 +92,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const leaderUpdatedDate = document.querySelector('#leaderUpdatedDate');
   const leaderEventUpdateResult = document.querySelector('#leaderEventUpdateResult');
   const leaderTaskForm = document.querySelector('#leaderTaskForm');
+  const leaderTaskEventSelect = document.querySelector('#leaderTaskEventSelect');
+  const leaderTaskAssigneeSelect = document.querySelector('#leaderTaskAssigneeSelect');
   const leaderTaskResult = document.querySelector('#leaderTaskResult');
   const leaderTaskUpdateForm = document.querySelector('#leaderTaskUpdateForm');
   const leaderTaskSelect = document.querySelector('#leaderTaskSelect');
@@ -110,6 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const ACCOUNTS_STORAGE_KEY = 'umugandaAccounts';
   const ATTENDANCE_SCANS_STORAGE_KEY = 'umugandaAttendanceScans';
   const AI_TRANSLATION_CACHE_KEY = 'umugandaAiTranslationCache';
+  const SESSION_STORAGE_KEY = 'umugandaSession';
+  const API_BASE = '/api';
 
   const DEFAULT_ADMIN_ACCOUNT = {
     id: 'admin-seed',
@@ -1221,6 +1225,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let accounts = [];
   let attendanceScans = [];
   let aiTranslationCache = {};
+  let authToken = '';
+  let communityMembers = [];
+  let feedbackItems = [];
   let translationRenderVersion = 0;
 
   function setResult(element, message, color = '#9cffc7') {
@@ -1274,6 +1281,213 @@ document.addEventListener('DOMContentLoaded', () => {
     return t(`roles.${role}`, {}, language) || role;
   }
 
+  function mapRoleFromApi(role) {
+    const normalizedRole = String(role || '').trim().toLowerCase();
+    if (normalizedRole === 'admin') return 'Admin';
+    if (normalizedRole === 'leader') return 'Leader';
+    return 'User';
+  }
+
+  function mapRoleToApi(role) {
+    const normalizedRole = String(role || '').trim().toLowerCase();
+    if (normalizedRole === 'admin') return 'admin';
+    if (normalizedRole === 'leader') return 'leader';
+    if (normalizedRole === 'user') return 'citizen';
+    return normalizedRole;
+  }
+
+  function formatEventDisplay(dateValue) {
+    return new Date(dateValue).toLocaleString(getLocale(), {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  }
+
+  function mapApiUser(user) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email || '',
+      phone: user.phone || '',
+      role: mapRoleFromApi(user.role),
+      status: user.status || 'approved',
+      permissions: {
+        canAddTasks: Boolean(user.permissions?.canManageWork)
+      }
+    };
+  }
+
+  function mapApiEvent(eventItem) {
+    return {
+      id: eventItem.id,
+      name: eventItem.title,
+      location: eventItem.location,
+      date: formatEventDisplay(eventItem.date),
+      isoDate: eventItem.date,
+      description: eventItem.description || ''
+    };
+  }
+
+  function mapApiTask(task) {
+    return {
+      id: task.id,
+      description: task.description,
+      zone: task.zone || '',
+      status: task.status || 'pending',
+      eventId: task.eventId,
+      assignedTo: task.assignedTo
+    };
+  }
+
+  function mapApiFeedbackItem(item) {
+    return `${item.message} - ${item.status}.`;
+  }
+
+  async function apiRequest(path, options = {}) {
+    const { method = 'GET', body = undefined, requireAuth = false } = options;
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
+    if (requireAuth && !authToken) {
+      throw new Error('You need to log in first.');
+    }
+
+    const response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+
+    const payload = await response
+      .json()
+      .catch(() => ({ message: 'Unexpected server response.' }));
+
+    if (!response.ok) {
+      throw new Error(payload.message || 'Request failed.');
+    }
+
+    return payload;
+  }
+
+  function saveSession(user, token) {
+    authToken = token;
+    localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({
+        token,
+        user
+      })
+    );
+  }
+
+  function loadSession() {
+    const rawSession = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!rawSession) return null;
+
+    try {
+      return JSON.parse(rawSession);
+    } catch (error) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+  }
+
+  function clearSession() {
+    authToken = '';
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  }
+
+  function taskStatusLabel(status) {
+    const normalizedStatus = String(status || 'pending').toLowerCase();
+
+    if (normalizedStatus === 'in_progress') {
+      return t('dashboard.tasksPanel.statusInProgress');
+    }
+
+    if (normalizedStatus === 'scheduled') {
+      return t('dashboard.tasksPanel.statusScheduled');
+    }
+
+    if (normalizedStatus === 'done') {
+      return 'Done';
+    }
+
+    return t('dashboard.tasksPanel.statusPending');
+  }
+
+  function applyBootstrapData(data) {
+    if (data?.homeStats) {
+      homeStats.attendanceRate = Number(data.homeStats.attendanceRate) || 0;
+      homeStats.adultsTracked = Number(data.homeStats.adultsTracked) || 0;
+    }
+
+    leaderData.events = Array.isArray(data?.events) ? data.events.map(mapApiEvent) : [];
+    feedbackItems = Array.isArray(data?.feedback)
+      ? data.feedback.map(mapApiFeedbackItem)
+      : [];
+
+    renderHomeStats();
+    renderDynamicData();
+  }
+
+  function applyDashboardData(data) {
+    if (data?.homeStats) {
+      homeStats.attendanceRate = Number(data.homeStats.attendanceRate) || 0;
+      homeStats.adultsTracked = Number(data.homeStats.adultsTracked) || 0;
+    }
+
+    leaderData.events = Array.isArray(data?.events) ? data.events.map(mapApiEvent) : [];
+    leaderData.tasks = Array.isArray(data?.tasks) ? data.tasks.map(mapApiTask) : [];
+    leaderData.collectionGoal = Number(data?.payments?.collectionGoal) || 0;
+    leaderData.collectedAmount = Number(data?.payments?.collectedAmount) || 0;
+    accounts = Array.isArray(data?.admin?.accounts) ? data.admin.accounts.map(mapApiUser) : [];
+    communityMembers = Array.isArray(data?.members) ? data.members.map(mapApiUser) : [];
+    attendanceScans = Array.isArray(data?.attendanceScans) ? data.attendanceScans : [];
+    feedbackItems = Array.isArray(data?.feedback)
+      ? data.feedback.map(mapApiFeedbackItem)
+      : [];
+
+    renderHomeStats();
+    renderDynamicData();
+    renderAdminPanels();
+    updateNotificationMenu();
+  }
+
+  async function refreshPublicData() {
+    applyBootstrapData(await apiRequest('/bootstrap'));
+  }
+
+  async function refreshDashboardData() {
+    if (!authToken || !currentAccount) return;
+    applyDashboardData(await apiRequest('/dashboard', { requireAuth: true }));
+  }
+
+  async function restoreSession() {
+    const savedSession = loadSession();
+    if (!savedSession?.token) return false;
+
+    authToken = savedSession.token;
+
+    try {
+      const payload = await apiRequest('/auth/session', { requireAuth: true });
+      const account = mapApiUser(payload.user);
+      applyDashboardData(payload.dashboard);
+      loginAccount(account);
+      return true;
+    } catch (error) {
+      clearSession();
+      return false;
+    }
+  }
+
   function currentTranslation() {
     return translations[currentLanguage] || translations.English;
   }
@@ -1283,7 +1497,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getDefaultTasks() {
-    return [...currentTranslation().defaults.tasks];
+    return currentTranslation().defaults.tasks.map((taskItem, index) => ({
+      id: `default-task-${index}`,
+      description: taskItem,
+      status:
+        index === 1 ? 'in_progress' : index === 2 ? 'scheduled' : 'pending',
+      zone: '',
+      eventId: ''
+    }));
   }
 
   function getDefaultNotificationItems() {
@@ -1689,22 +1910,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateHomeStatsOnNewLogin() {
-    const previousRate = homeStats.attendanceRate;
-    const change = Math.floor(Math.random() * 8) - 4;
-    const nextRate = Math.max(65, Math.min(95, previousRate + change));
-    homeStats.attendanceRate = nextRate;
-    homeStats.adultsTracked = Math.min(442, Math.max(95, homeStats.adultsTracked + 1));
-    saveHomeStats();
     renderHomeStats();
   }
 
   function updateHomeStatsPeriodically() {
-    const previousRate = homeStats.attendanceRate;
-    const change = Math.floor(Math.random() * 5) - 2;
-    const nextRate = Math.max(65, Math.min(95, previousRate + change));
-    homeStats.attendanceRate = nextRate;
-    homeStats.adultsTracked = Math.min(442, Math.max(95, homeStats.adultsTracked + Math.floor(Math.random() * 2)));
-    saveHomeStats();
     renderHomeStats();
   }
 
@@ -1729,7 +1938,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderFeedbackStatusItems() {
-    const items = getDefaultFeedbackItems();
+    const items = feedbackItems.length > 0 ? feedbackItems : getDefaultFeedbackItems();
     feedbackStatusList.innerHTML = '';
 
     items.forEach((itemText) => {
@@ -1766,24 +1975,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function renderTasksList() {
     const items = getVisibleTasks();
-    const translatedTasks = leaderData.tasks.length > 0 ? await translateDynamicTexts(items) : items;
-    const statuses = [
-      t('dashboard.tasksPanel.statusPending'),
-      t('dashboard.tasksPanel.statusInProgress'),
-      t('dashboard.tasksPanel.statusScheduled')
-    ];
+    const translatedTasks =
+      leaderData.tasks.length > 0
+        ? await translateDynamicTexts(items.map((taskItem) => taskItem.description))
+        : items.map((taskItem) => taskItem.description);
 
     tasksList.innerHTML = '';
     items.forEach((taskItem, index) => {
       const li = document.createElement('li');
-      const status =
-        index === 1 && leaderData.tasks.length === 0
-          ? statuses[1]
-          : index === 2 && leaderData.tasks.length === 0
-            ? statuses[2]
-            : statuses[0];
+      const status = taskStatusLabel(taskItem.status);
+      const zoneLabel = taskItem.zone ? ` (${taskItem.zone})` : '';
 
-      li.innerHTML = `${translatedTasks[index] || taskItem} - <span class="visual-tag task-status-tag">${status}</span>`;
+      li.innerHTML = `${translatedTasks[index] || taskItem.description}${zoneLabel} - <span class="visual-tag task-status-tag">${status}</span>`;
       tasksList.appendChild(li);
     });
   }
@@ -1801,11 +2004,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (leaderTaskSelect) {
       const tasks = getVisibleTasks();
-      const translatedTasks = leaderData.tasks.length > 0 ? await translateDynamicTexts(tasks) : tasks;
+      const translatedTasks =
+        leaderData.tasks.length > 0
+          ? await translateDynamicTexts(tasks.map((taskItem) => taskItem.description))
+          : tasks.map((taskItem) => taskItem.description);
       leaderTaskSelect.innerHTML = tasks
-        .map((taskItem, index) => `<option value="${index}">${translatedTasks[index] || taskItem}</option>`)
+        .map((taskItem, index) => `<option value="${index}">${translatedTasks[index] || taskItem.description}</option>`)
         .join('');
       leaderTaskSelect.disabled = tasks.length === 0;
+    }
+
+    if (leaderTaskEventSelect) {
+      const events = getVisibleEvents();
+      const translatedNames =
+        leaderData.events.length > 0
+          ? await translateDynamicTexts(events.map((eventItem) => eventItem.name))
+          : events.map((eventItem) => eventItem.name);
+
+      leaderTaskEventSelect.innerHTML = events
+        .map(
+          (eventItem, index) =>
+            `<option value="${eventItem.id}">${translatedNames[index] || eventItem.name}</option>`
+        )
+        .join('');
+      leaderTaskEventSelect.disabled = events.length === 0;
+    }
+
+    if (leaderTaskAssigneeSelect) {
+      const members = communityMembers.length > 0 ? communityMembers : accounts.filter((account) => account.role === 'User');
+      leaderTaskAssigneeSelect.innerHTML = members
+        .map(
+          (member) =>
+            `<option value="${member.id}">${member.name}${member.village ? ` - ${member.village}` : ''}</option>`
+        )
+        .join('');
+      leaderTaskAssigneeSelect.disabled = members.length === 0;
     }
   }
 
@@ -1948,6 +2181,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const allowed = role === 'all' || role === currentRole;
       link.classList.toggle('hidden', !allowed);
     });
+
+    if (sendReminderButton) {
+      sendReminderButton.disabled = !['Leader', 'Admin'].includes(currentRole);
+    }
 
     renderDynamicData();
     renderAdminPanels();
@@ -2180,6 +2417,8 @@ document.addEventListener('DOMContentLoaded', () => {
     leaderUpdatedLocation.placeholder = t('dashboard.leaderPanel.updatedLocationPlaceholder');
     leaderUpdatedDate.placeholder = t('dashboard.leaderPanel.updatedDatePlaceholder');
     setText(leaderEventUpdateForm.querySelector('button[type="submit"]'), t('dashboard.leaderPanel.updateEvent'));
+    setText(document.querySelector('label[for="leaderTaskEventSelect"]'), t('dashboard.leaderPanel.chooseEvent'));
+    setText(document.querySelector('label[for="leaderTaskAssigneeSelect"]'), 'Assign to member');
     setText(document.querySelector('label[for="leaderTaskName"]'), t('dashboard.leaderPanel.taskName'));
     document.querySelector('#leaderTaskName').placeholder = t('dashboard.leaderPanel.taskNamePlaceholder');
     setText(leaderTaskForm.querySelector('button[type="submit"]'), t('dashboard.leaderPanel.addTask'));
@@ -2276,7 +2515,6 @@ document.addEventListener('DOMContentLoaded', () => {
     currentRole = account.role;
     isLoggedIn = true;
     settingsNameInput.value = account.name;
-    updateHomeStatsOnNewLogin();
     renderWelcomeTitle();
     updateAccountMenu();
     applyRolePermissions();
@@ -2309,12 +2547,18 @@ document.addEventListener('DOMContentLoaded', () => {
     isLoggedIn = false;
     currentRole = '';
     currentAccount = null;
+    accounts = [];
+    communityMembers = [];
+    attendanceScans = [];
+    leaderData.tasks = [];
+    clearSession();
     loginRole.value = '';
     registerRole.value = '';
     updateAccountMenu();
     updateHeaderVisibility();
     showOnlySection('login');
     resetDashboardState();
+    refreshPublicData().catch(() => {});
     document.querySelector('#login').scrollIntoView({ behavior: 'smooth' });
   }
 
@@ -2328,24 +2572,43 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  loadSettings();
-  loadAccounts();
-  loadLeaderData();
-  loadHomeStats();
-  loadAttendanceScans();
-  loadAiTranslationCache();
-  applyTranslations();
-  updateHeaderVisibility();
-  updateAccountMenu();
-  homeStatsInterval = setInterval(updateHomeStatsPeriodically, 6000);
+  async function initializeApp() {
+    loadSettings();
+    loadAiTranslationCache();
+    applyTranslations();
+    updateHeaderVisibility();
+    updateAccountMenu();
+    await refreshPublicData();
+    await restoreSession();
 
-  forgotPasswordButton.addEventListener('click', () => {
+    if (homeStatsInterval) {
+      clearInterval(homeStatsInterval);
+    }
+
+    homeStatsInterval = setInterval(() => {
+      const refresh = isLoggedIn ? refreshDashboardData : refreshPublicData;
+      refresh().catch(() => {});
+    }, 30000);
+  }
+
+  forgotPasswordButton.addEventListener('click', async () => {
     const accountTarget = loginInput.value.trim();
     if (!accountTarget) {
       setResult(forgotPasswordResult, t('messages.forgotNeedAccount'), '#ffd166');
       return;
     }
-    setResult(forgotPasswordResult, t('messages.forgotSent', { target: accountTarget }));
+
+    try {
+      const payload = await apiRequest('/auth/forgot-password', {
+        method: 'POST',
+        body: {
+          identifier: accountTarget
+        }
+      });
+      setResult(forgotPasswordResult, payload.message || t('messages.forgotSent', { target: accountTarget }));
+    } catch (error) {
+      setResult(forgotPasswordResult, error.message, '#ffd166');
+    }
   });
 
   showRegisterLink.addEventListener('click', (event) => {
@@ -2361,7 +2624,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loginCard.classList.remove('hidden');
   });
 
-  loginForm.addEventListener('submit', (event) => {
+  loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const selectedRole = loginRole.value;
     const enteredPassword = document.querySelector('#loginPassword').value.trim();
@@ -2372,41 +2635,29 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const account = getAccountByLogin(loginMethod.value, enteredTarget);
+    try {
+      const payload = await apiRequest('/auth/login', {
+        method: 'POST',
+        body: {
+          identifier: enteredTarget,
+          [loginMethod.value === 'phone' ? 'phone' : 'email']: enteredTarget,
+          password: enteredPassword,
+          role: mapRoleToApi(selectedRole)
+        }
+      });
 
-    if (selectedRole === 'Admin' && (!account || account.password !== enteredPassword || account.role !== 'Admin')) {
-      setResult(loginRoleResult, t('messages.adminDenied'), '#ffd166');
-      return;
+      const account = mapApiUser(payload.user);
+      saveSession(account, payload.token);
+      applyDashboardData(payload.dashboard);
+      setResult(loginRoleResult, '');
+      loginAccount(account);
+      loginForm.reset();
+      loginMethod.value = 'email';
+      loginMethodButtons.forEach((item) => item.classList.toggle('active', item.dataset.method === 'email'));
+      updateLoginMethod();
+    } catch (error) {
+      setResult(loginRoleResult, error.message, '#ffd166');
     }
-
-    if (!account || account.password !== enteredPassword) {
-      setResult(loginRoleResult, t('messages.invalidLogin'), '#ffd166');
-      return;
-    }
-
-    if (account.role !== selectedRole) {
-      setResult(
-        loginRoleResult,
-        t('messages.wrongRole', {
-          role: roleLabel(account.role),
-          selectedRole: roleLabel(selectedRole)
-        }),
-        '#ffd166'
-      );
-      return;
-    }
-
-    if (account.status !== 'approved') {
-      setResult(loginRoleResult, t('messages.pendingApproval'), '#ffd166');
-      return;
-    }
-
-    setResult(loginRoleResult, '');
-    loginAccount(account);
-    loginForm.reset();
-    loginMethod.value = 'email';
-    loginMethodButtons.forEach((item) => item.classList.toggle('active', item.dataset.method === 'email'));
-    updateLoginMethod();
   });
 
   dashboardLinks.forEach((link) => {
@@ -2469,31 +2720,23 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const alreadyScanned = attendanceScans.some((scan) => scan.accountId === currentAccount.id && scan.eventId === eventItem.id);
+    try {
+      await apiRequest('/attendance/mark', {
+        method: 'POST',
+        requireAuth: true,
+        body: {
+          eventId: eventItem.id,
+          qrData: `umuganda:event:${eventItem.id}`
+        }
+      });
 
-    if (alreadyScanned) {
-      setResult(qrScanResult, t('messages.alreadyScanned'), '#ffd166');
-      return;
+      await refreshDashboardData();
+      const [translatedEventName] = await translateDynamicTexts([eventItem.name]);
+      setResult(qrScanResult, t('messages.attendanceMarked', { event: translatedEventName || eventItem.name }));
+      setResult(eventsResult, t('messages.attendanceAccepted'));
+    } catch (error) {
+      setResult(qrScanResult, error.message, '#ffd166');
     }
-
-    attendanceScans.push({
-      id: `scan-${Date.now()}`,
-      accountId: currentAccount.id,
-      eventId: eventItem.id,
-      name: currentAccount.name,
-      email: currentAccount.email,
-      eventName: eventItem.name,
-      location: eventItem.location,
-      date: eventItem.date,
-      scannedAt: new Date().toISOString()
-    });
-
-    saveAttendanceScans();
-    renderAttendanceOverview();
-    updateNotificationMenu();
-    const [translatedEventName] = await translateDynamicTexts([eventItem.name]);
-    setResult(qrScanResult, t('messages.attendanceMarked', { event: translatedEventName || eventItem.name }));
-    setResult(eventsResult, t('messages.attendanceAccepted'));
   });
 
   cancelQrScanButton?.addEventListener('click', () => {
@@ -2506,11 +2749,28 @@ document.addEventListener('DOMContentLoaded', () => {
     setResult(notificationsResult, t('messages.notificationsRead'));
   });
 
-  sendReminderButton.addEventListener('click', () => {
-    setResult(eventsResult, t('messages.reminderSent', { time: formatTime(new Date()) }));
+  sendReminderButton.addEventListener('click', async () => {
+    const nextEvent = getVisibleEvents()[0];
+    if (!nextEvent) {
+      setResult(eventsResult, 'No event is available to remind people about yet.', '#ffd166');
+      return;
+    }
+
+    try {
+      await apiRequest('/events/reminders', {
+        method: 'POST',
+        requireAuth: true,
+        body: {
+          eventId: nextEvent.id
+        }
+      });
+      setResult(eventsResult, t('messages.reminderSent', { time: formatTime(new Date()) }));
+    } catch (error) {
+      setResult(eventsResult, error.message, '#ffd166');
+    }
   });
 
-  approvalRequestsList?.addEventListener('click', (event) => {
+  approvalRequestsList?.addEventListener('click', async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLButtonElement) || !target.classList.contains('account-action')) return;
 
@@ -2519,61 +2779,78 @@ document.addEventListener('DOMContentLoaded', () => {
     const account = accounts.find((item) => item.id === accountId);
     if (!account) return;
 
-    if (action === 'approve') {
-      account.status = 'approved';
-      saveAccounts();
-      renderAdminPanels();
-      setResult(approvalRequestsResult, t('messages.accountApproved', { name: account.name, role: roleLabel(account.role) }));
-      return;
-    }
-
-    if (action === 'reject') {
-      accounts = accounts.filter((item) => item.id !== accountId);
-      saveAccounts();
-      renderAdminPanels();
-      setResult(approvalRequestsResult, t('messages.accountRejected'));
+    try {
+      await apiRequest(`/users/${accountId}/approval`, {
+        method: 'PATCH',
+        requireAuth: true,
+        body: {
+          status: action === 'approve' ? 'approved' : 'rejected'
+        }
+      });
+      await refreshDashboardData();
+      setResult(
+        approvalRequestsResult,
+        action === 'approve'
+          ? t('messages.accountApproved', { name: account.name, role: roleLabel(account.role) })
+          : t('messages.accountRejected')
+      );
+    } catch (error) {
+      setResult(approvalRequestsResult, error.message, '#ffd166');
     }
   });
 
-  leaderPermissionsList?.addEventListener('click', (event) => {
+  leaderPermissionsList?.addEventListener('click', async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLButtonElement) || !target.classList.contains('leader-permission-toggle')) return;
 
     const account = accounts.find((item) => item.id === target.dataset.accountId);
     if (!account) return;
 
-    account.permissions.canAddTasks = !account.permissions.canAddTasks;
-    saveAccounts();
-    renderAdminPanels();
-    setResult(
-      leaderPermissionsResult,
-      account.permissions.canAddTasks
-        ? t('messages.leaderPermissionGranted', { name: account.name })
-        : t('messages.leaderPermissionRemoved', { name: account.name })
-    );
-
-    if (currentAccount && currentAccount.id === account.id) {
-      currentAccount = { ...account };
-      updateLeaderTaskAccessUI();
+    try {
+      const nextPermission = !account.permissions.canAddTasks;
+      await apiRequest(`/users/${account.id}/permissions`, {
+        method: 'PATCH',
+        requireAuth: true,
+        body: {
+          canManageWork: nextPermission
+        }
+      });
+      await refreshDashboardData();
+      setResult(
+        leaderPermissionsResult,
+        nextPermission
+          ? t('messages.leaderPermissionGranted', { name: account.name })
+          : t('messages.leaderPermissionRemoved', { name: account.name })
+      );
+    } catch (error) {
+      setResult(leaderPermissionsResult, error.message, '#ffd166');
     }
   });
 
-  memberRoleList?.addEventListener('click', (event) => {
+  memberRoleList?.addEventListener('click', async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLButtonElement) || !target.classList.contains('member-role-toggle')) return;
 
     const account = accounts.find((item) => item.id === target.dataset.accountId);
     if (!account) return;
 
-    account.role = 'Leader';
-    account.permissions.canAddTasks = false;
-    saveAccounts();
-    renderAdminPanels();
-    setResult(memberRoleResult, t('messages.promotedToLeader', { name: account.name }));
+    try {
+      await apiRequest(`/users/${account.id}/role`, {
+        method: 'PUT',
+        requireAuth: true,
+        body: {
+          role: 'leader'
+        }
+      });
+      await refreshDashboardData();
+      setResult(memberRoleResult, t('messages.promotedToLeader', { name: account.name }));
+    } catch (error) {
+      setResult(memberRoleResult, error.message, '#ffd166');
+    }
   });
 
   if (leaderEventForm) {
-    leaderEventForm.addEventListener('submit', (event) => {
+    leaderEventForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (currentRole !== 'Leader') return;
 
@@ -2582,23 +2859,27 @@ document.addEventListener('DOMContentLoaded', () => {
       const date = document.querySelector('#leaderEventDate').value.trim();
       if (!name || !location || !date) return;
 
-      ensureEditableEvents();
-      leaderData.events.unshift({
-        id: `event-${Date.now()}-${slugify(name)}`,
-        name,
-        location,
-        date
-      });
-      saveLeaderData();
-      renderEventsList();
-      renderLeaderSelectors();
-      setResult(leaderEventResult, t('messages.eventAdded'));
-      leaderEventForm.reset();
+      try {
+        await apiRequest('/events', {
+          method: 'POST',
+          requireAuth: true,
+          body: {
+            title: name,
+            location,
+            date
+          }
+        });
+        await refreshDashboardData();
+        setResult(leaderEventResult, t('messages.eventAdded'));
+        leaderEventForm.reset();
+      } catch (error) {
+        setResult(leaderEventResult, error.message, '#ffd166');
+      }
     });
   }
 
   if (leaderEventUpdateForm) {
-    leaderEventUpdateForm.addEventListener('submit', (event) => {
+    leaderEventUpdateForm.addEventListener('submit', async (event) => {
       event.preventDefault();
 
       if (!canCurrentLeaderManageWork()) {
@@ -2611,25 +2892,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const newDate = leaderUpdatedDate.value.trim();
       if (!Number.isInteger(selectedIndex) || !newLocation || !newDate) return;
 
-      ensureEditableEvents();
-      if (!leaderData.events[selectedIndex]) return;
+      const selectedEvent = leaderData.events[selectedIndex];
+      if (!selectedEvent) return;
 
-      leaderData.events[selectedIndex] = {
-        ...leaderData.events[selectedIndex],
-        location: newLocation,
-        date: newDate
-      };
-
-      saveLeaderData();
-      renderEventsList();
-      renderLeaderSelectors();
-      setResult(leaderEventUpdateResult, t('messages.eventUpdated'));
-      leaderEventUpdateForm.reset();
+      try {
+        await apiRequest(`/events/${selectedEvent.id}`, {
+          method: 'PUT',
+          requireAuth: true,
+          body: {
+            location: newLocation,
+            date: newDate
+          }
+        });
+        await refreshDashboardData();
+        setResult(leaderEventUpdateResult, t('messages.eventUpdated'));
+        leaderEventUpdateForm.reset();
+      } catch (error) {
+        setResult(leaderEventUpdateResult, error.message, '#ffd166');
+      }
     });
   }
 
   if (leaderTaskForm) {
-    leaderTaskForm.addEventListener('submit', (event) => {
+    leaderTaskForm.addEventListener('submit', async (event) => {
       event.preventDefault();
 
       if (!canCurrentLeaderManageWork()) {
@@ -2638,20 +2923,31 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const taskName = document.querySelector('#leaderTaskName').value.trim();
-      if (!taskName) return;
+      const eventId = leaderTaskEventSelect?.value;
+      const assignedTo = leaderTaskAssigneeSelect?.value;
+      if (!taskName || !eventId || !assignedTo) return;
 
-      ensureEditableTasks();
-      leaderData.tasks.unshift(taskName);
-      saveLeaderData();
-      renderTasksList();
-      renderLeaderSelectors();
-      setResult(leaderTaskResult, t('messages.taskAdded'));
-      leaderTaskForm.reset();
+      try {
+        await apiRequest('/tasks', {
+          method: 'POST',
+          requireAuth: true,
+          body: {
+            eventId,
+            assignedTo,
+            description: taskName
+          }
+        });
+        await refreshDashboardData();
+        setResult(leaderTaskResult, t('messages.taskAdded'));
+        leaderTaskForm.reset();
+      } catch (error) {
+        setResult(leaderTaskResult, error.message, '#ffd166');
+      }
     });
   }
 
   if (leaderTaskUpdateForm) {
-    leaderTaskUpdateForm.addEventListener('submit', (event) => {
+    leaderTaskUpdateForm.addEventListener('submit', async (event) => {
       event.preventDefault();
 
       if (!canCurrentLeaderManageWork()) {
@@ -2663,56 +2959,86 @@ document.addEventListener('DOMContentLoaded', () => {
       const updatedTask = leaderUpdatedTaskName.value.trim();
       if (!Number.isInteger(selectedIndex) || !updatedTask) return;
 
-      ensureEditableTasks();
-      if (!leaderData.tasks[selectedIndex]) return;
+      const selectedTask = leaderData.tasks[selectedIndex];
+      if (!selectedTask) return;
 
-      leaderData.tasks[selectedIndex] = updatedTask;
-      saveLeaderData();
-      renderTasksList();
-      renderLeaderSelectors();
-      setResult(leaderTaskUpdateResult, t('messages.taskUpdated'));
-      leaderTaskUpdateForm.reset();
+      try {
+        await apiRequest(`/tasks/${selectedTask.id}`, {
+          method: 'PUT',
+          requireAuth: true,
+          body: {
+            description: updatedTask
+          }
+        });
+        await refreshDashboardData();
+        setResult(leaderTaskUpdateResult, t('messages.taskUpdated'));
+        leaderTaskUpdateForm.reset();
+      } catch (error) {
+        setResult(leaderTaskUpdateResult, error.message, '#ffd166');
+      }
     });
   }
 
   if (leaderCollectionForm) {
-    leaderCollectionForm.addEventListener('submit', (event) => {
+    leaderCollectionForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (currentRole !== 'Leader') return;
 
       const goal = Number(document.querySelector('#leaderCollectionGoal').value);
       if (!goal) return;
-      leaderData.collectionGoal = goal;
-      saveLeaderData();
-      setResult(leaderCollectionResult, t('messages.collectionGoalSet', { goal: formatNumber(goal) }));
+
+      try {
+        await apiRequest('/payments/goal', {
+          method: 'POST',
+          requireAuth: true,
+          body: {
+            amount: goal
+          }
+        });
+        await refreshDashboardData();
+        setResult(leaderCollectionResult, t('messages.collectionGoalSet', { goal: formatNumber(goal) }));
+      } catch (error) {
+        setResult(leaderCollectionResult, error.message, '#ffd166');
+      }
     });
   }
 
   if (depositForm) {
-    depositForm.addEventListener('submit', (event) => {
+    depositForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const amount = Number(document.querySelector('#depositAmount').value);
       if (!amount || amount < 100) return;
-      leaderData.collectedAmount += amount;
-      saveLeaderData();
-      const remaining = Math.max(leaderData.collectionGoal - leaderData.collectedAmount, 0);
-      setResult(
-        depositResult,
-        t('messages.depositReceived', {
-          amount: formatNumber(amount),
-          remaining: formatNumber(remaining)
-        })
-      );
-      depositForm.reset();
+
+      try {
+        const result = await apiRequest('/payments/deposit', {
+          method: 'POST',
+          requireAuth: true,
+          body: {
+            amount
+          }
+        });
+        await refreshDashboardData();
+        setResult(
+          depositResult,
+          t('messages.depositReceived', {
+            amount: formatNumber(amount),
+            remaining: formatNumber(result.remaining)
+          })
+        );
+        depositForm.reset();
+      } catch (error) {
+        setResult(depositResult, error.message, '#ffd166');
+      }
     });
   }
 
-  syncTasksButton.addEventListener('click', () => {
-    tasksList.querySelectorAll('.task-status-tag').forEach((tag, index) => {
-      tag.textContent = index === 0 ? t('dashboard.tasksPanel.statusInProgress') : t('dashboard.tasksPanel.statusSynced');
-      tag.classList.add('is-synced');
-    });
-    setResult(tasksResult, t('messages.tasksSynced'));
+  syncTasksButton.addEventListener('click', async () => {
+    try {
+      await refreshDashboardData();
+      setResult(tasksResult, t('messages.tasksSynced'));
+    } catch (error) {
+      setResult(tasksResult, error.message, '#ffd166');
+    }
   });
 
   exportFeedbackButton.addEventListener('click', () => {
@@ -2807,13 +3133,30 @@ document.addEventListener('DOMContentLoaded', () => {
     stopLiveOverview();
   });
 
-  feedbackForm.addEventListener('submit', (event) => {
+  feedbackForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    setResult(feedbackResult, t('messages.feedbackSubmitted'));
-    feedbackForm.reset();
+    const name = document.querySelector('#feedbackName').value.trim();
+    const email = document.querySelector('#feedbackEmail').value.trim();
+    const message = document.querySelector('#feedbackMessage').value.trim();
+
+    try {
+      await apiRequest('/feedback', {
+        method: 'POST',
+        body: {
+          name,
+          email,
+          message
+        }
+      });
+      await refreshPublicData();
+      setResult(feedbackResult, t('messages.feedbackSubmitted'));
+      feedbackForm.reset();
+    } catch (error) {
+      setResult(feedbackResult, error.message, '#ffd166');
+    }
   });
 
-  registerForm.addEventListener('submit', (event) => {
+  registerForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const selectedRole = registerRole.value;
     const name = document.querySelector('#registerName').value.trim();
@@ -2830,39 +3173,46 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const emailExists = accounts.some((account) => normalizeAccountTarget(account.email) === normalizeAccountTarget(email));
-    if (emailExists) {
-      setResult(registerRoleResult, t('messages.emailExists'), '#ffd166');
-      return;
+    try {
+      await apiRequest('/auth/register', {
+        method: 'POST',
+        body: {
+          name,
+          email,
+          password,
+          role: mapRoleToApi(selectedRole)
+        }
+      });
+      setResult(registerRoleResult, t('messages.registrationSubmitted', { role: roleLabel(selectedRole) }));
+      registerForm.reset();
+      registerPanel.classList.add('hidden');
+      loginCard.classList.remove('hidden');
+      document.querySelector('#login').scrollIntoView({ behavior: 'smooth' });
+    } catch (error) {
+      setResult(registerRoleResult, error.message, '#ffd166');
     }
-
-    accounts.push({
-      id: `acct-${Date.now()}`,
-      name,
-      email,
-      phone: '',
-      password,
-      role: selectedRole,
-      status: 'pending',
-      permissions: {
-        canAddTasks: false
-      }
-    });
-
-    saveAccounts();
-    renderAdminPanels();
-    setResult(registerRoleResult, t('messages.registrationSubmitted', { role: roleLabel(selectedRole) }));
-
-    registerForm.reset();
-    registerPanel.classList.add('hidden');
-    loginCard.classList.remove('hidden');
-    document.querySelector('#login').scrollIntoView({ behavior: 'smooth' });
   });
 
-  contactForm.addEventListener('submit', (event) => {
+  contactForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    setResult(contactResult, t('messages.contactSent'));
-    contactForm.reset();
+    const name = document.querySelector('#contactName').value.trim();
+    const email = document.querySelector('#contactEmail').value.trim();
+    const message = document.querySelector('#contactMessage').value.trim();
+
+    try {
+      await apiRequest('/contact', {
+        method: 'POST',
+        body: {
+          name,
+          email,
+          message
+        }
+      });
+      setResult(contactResult, t('messages.contactSent'));
+      contactForm.reset();
+    } catch (error) {
+      setResult(contactResult, error.message, '#ffd166');
+    }
   });
 
   menuToggle.addEventListener('click', () => {
@@ -2888,6 +3238,10 @@ document.addEventListener('DOMContentLoaded', () => {
         siteNav.classList.remove('open');
       }
     });
+  });
+
+  initializeApp().catch((error) => {
+    setResult(loginRoleResult, error.message, '#ffd166');
   });
 });
 const password = document.getElementById("loginPassword");

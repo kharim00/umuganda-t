@@ -1,77 +1,89 @@
-const User = require("../database/models/userModel");
-const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-// 🔑 GENERATE TOKEN
-const generateToken = (user) => {
-  return jwt.sign(
-    { id: user.id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-};
+function toPublicUser(user) {
+  return {
+    ...user,
+    role: user.role
+  };
+}
 
-// ✅ REGISTER
-exports.register = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
-const { name, phone, password, role } = req.body;
+    const dataService = req.app.locals.dataService;
+    const config = req.app.locals.config;
 
-    const validRoles = ['citizen', 'leader', 'admin'];
-    if (role && !validRoles.includes(role)) {
-      return res.status(400).json({ message: 'Invalid role. Must be one of: citizen, leader, admin.' });
-    }
-
-// check if user exists
-    const existingUser = await User.findOne({ where: { phone } });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    // hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // create user
-    const user = await User.create({
-      name,
-      phone,
-      password: hashedPassword,
-      role: role || "citizen",
+    const user = await dataService.login({
+      identifier: req.body.phone || req.body.email || req.body.identifier,
+      password: req.body.password,
+      role: req.body.role
     });
 
-    res.status(201).json({
-      message: "User registered successfully",
-      user,
-    });
+    const token = jwt.sign(
+      {
+        id: user.id,
+        role: user.role
+      },
+      config.jwtSecret,
+      { expiresIn: "7d" }
+    );
 
+    res.json({
+      message: "Login successful.",
+      token,
+      user: toPublicUser(user),
+      dashboard: await dataService.getDashboard(user)
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-// ✅ LOGIN
-exports.login = async (req, res) => {
+exports.register = async (req, res, next) => {
   try {
-    const { phone, password } = req.body;
-
-    const user = await User.findOne({ where: { phone } });
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    res.json({
-      message: "Login successful",
-      token: generateToken(user),
-      user,
+    const dataService = req.app.locals.dataService;
+    const { user, approvalRequired } = await dataService.registerUser({
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      password: req.body.password,
+      role: req.body.role,
+      village: req.body.village
     });
 
+    res.status(201).json({
+      message: approvalRequired
+        ? "Registration submitted. Wait for admin approval before login."
+        : "User registered successfully.",
+      approvalRequired,
+      user: toPublicUser(user)
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
+  }
+};
+
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const dataService = req.app.locals.dataService;
+    const result = await dataService.submitForgotPassword({
+      identifier: req.body.identifier
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getSession = async (req, res, next) => {
+  try {
+    const dataService = req.app.locals.dataService;
+
+    res.json({
+      user: toPublicUser(req.currentUser),
+      dashboard: await dataService.getDashboard(req.currentUser)
+    });
+  } catch (error) {
+    next(error);
   }
 };

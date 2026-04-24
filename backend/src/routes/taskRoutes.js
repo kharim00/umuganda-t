@@ -1,17 +1,15 @@
 const express = require("express");
-const router = express.Router();
 
 const taskController = require("../controller/taskController");
 const auth = require("../middleware/authMiddleware");
 const role = require("../middleware/roleMiddleware");
 
-// Assign task → leader/admin only
+const router = express.Router();
+
 router.post("/", auth, role("leader", "admin"), taskController.assignTask);
-
-// Citizen → get own tasks
-router.get("/my", auth, role("citizen"), taskController.getMyTasks);
-
-// Leader → view tasks by event
+router.get("/my", auth, taskController.getMyTasks);
 router.get("/event/:eventId", auth, role("leader", "admin"), taskController.getTasksByEvent);
+router.put("/:id", auth, role("leader", "admin"), taskController.updateTask);
+router.patch("/:id/status", auth, taskController.updateTaskStatus);
 
 module.exports = router;
