@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js",
+    "dev": "node index.js",
     "db:seed": "node src/database/seed.js",
     "db:seed:dev": "node src/database/seed.js",
     "test": "node test/api.test.js"
